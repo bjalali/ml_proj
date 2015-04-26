@@ -1,0 +1,83 @@
+---
+title: "Machine Learning Project; B. Jalali; April 2015"
+output: html_document
+---
+
+# 1. Executive Summary
+We use random forest model to predict the manner of 20 observations on doing 
+weight lifting exercise. In this experiment six participants were asked to perform 
+Dumbbell Biceps Curl exercise in five different fashions (Classes A, B, C, D and E),
+of which only class A is the correct way. 
+
+Cross validation on 25% of the training data reveals 99% out of sample accuracy. 
+OOB estimate of error rate is about 0.6%. Further, using **importance(model)** we see that **roll_belt** and **yaw_belt** are among the most important predictors.
+
+We successfully predict all 20 test observations correctly!
+
+# 2. Reading and Preprocessing the data 
+```{r,echo=TRUE, , message=FALSE}
+library(caret); library(kernlab); library(randomForest)
+```
+
+## Read the training csv file 
+```{r,echo=TRUE, , message=FALSE}
+data_training <- read.csv("pml-training.csv", na.strings= c("NA",""," "))
+```
+
+## Cleaning the data by removing columns with NAs
+```{r,echo=TRUE, , message=FALSE}
+data_training_NA <- apply(data_training, 2, function(x) {sum(is.na(x))})
+data_training_clean <- data_training[, which(data_training_NA == 0)]
+
+# Final preprocessing by removing not useful 1-7th columns
+data_training_clean <- data_training_clean[8:length(data_training_clean)]
+```
+
+# 3. Split the cleaned training data into two sub groups: training and testing for cross validation
+```{r,echo=TRUE, , message=FALSE}
+# set a seed number
+set.seed(2015)
+
+inTrain <- createDataPartition(y = data_training_clean$classe, p = 0.75, list = FALSE)
+training <- data_training_clean[inTrain, ]
+testing_cv <- data_training_clean[-inTrain, ]
+```
+
+# 4a. Fit a model to predict the classe using all the rest of the variables as predictors
+```{r,echo=TRUE, , message=FALSE}
+model <- randomForest(classe ~ ., data = training, ntree=101)
+model
+```
+
+# 4b. Cross validating the model using the remaining 25% of the training data
+```{r,echo=TRUE, , message=FALSE}
+predict_cv <- predict(model, testing_cv)
+confusionMatrix(testing_cv$classe, predict_cv)
+```
+
+We obtained 0.99 accuracy in our modeling of sub-training data and using the 
+sub-training test group. 
+
+# 5. Final prediction on the pml-test testing data after the same preprocessing steps
+```{r,echo=TRUE, , message=FALSE}
+data_test <- read.csv("pml-testing.csv", na.strings= c("NA",""," "))
+data_test_NA <- apply(data_test, 2, function(x) {sum(is.na(x))})
+data_test_clean <- data_test[, which(data_test_NA == 0)]
+data_test_clean <- data_test_clean[8:length(data_test_clean)]
+
+# Predict the classes of the test data 
+predict_test <- predict(model, data_test_clean)
+```
+
+# 6. Writing predicted answers in files
+```{r,echo=TRUE, , message=FALSE}
+answers <- as.character(predict(model, data_test_clean))
+pml_write_files = function(x){
+        n = length(x)
+        for(i in 1:n){
+                filename = paste0("problem_id_",i,".txt")
+                write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+        }
+}
+pml_write_files(answers)
+```
